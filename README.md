@@ -1,5 +1,6 @@
 ## tmon##
-tmon implements a Raspberry Pi based watchdog for temperature logging and intrusion detection in a dataroom and has the following features: •Multiple Dallas DS18S20 type thermometers support. These thermometers can be plugged in and removed on the fly:
+tmon implements a Raspberry Pi based watchdog for temperature logging and intrusion detection in a dataroom and has the following features: 
+- Multiple Dallas DS18S20 type thermometers support. These thermometers can be plugged in and removed on the fly
 - System temperature monitoring
 - Sensor address aliasing for user friendly operation
 - Three door contact sensors
