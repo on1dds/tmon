@@ -35,8 +35,9 @@ tmon implements a Raspberry Pi based watchdog for temperature logging and intrus
 ![breadboard](schema/2015-05-24%20tmon_bb.png?raw=true)
 
 ## Database##
-MySQL Database on the Raspberry Pi with the 'log' table in this form:
-
+- data are stored in MySQL database directly on the Raspberry Pi.
+- database name = 'tmon'
+- table 'log' has te be created manually for now:
     +----------+-------------+------+-------+---------------------+
     |Field     |Type         | Null | Key   | Default Extra       |
     +----------+-------------+------+-------+---------------------|
