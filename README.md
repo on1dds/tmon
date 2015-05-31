@@ -29,10 +29,11 @@ tmon implements a Raspberry Pi based watchdog for temperature logging and intrus
 - Written for Python 2.7.3.
 
 ## Schematic##
-![schematic](schema/2015-05-24%20tmon_schem.png?raw=true)
+schematics are drawn with [Fritzing.0.9.1b](http://fritzing.org/)
+![schematic](schema/tmon_schem.png?raw=true)
 
 ## Breadboard##
-![breadboard](schema/2015-05-24%20tmon_bb.png?raw=true)
+![breadboard](schema/tmon_bb.png?raw=true)
 
 ## Database##
 - data are stored in MySQL database directly on the Raspberry Pi.
