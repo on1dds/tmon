@@ -6,7 +6,7 @@ tmon implements a Raspberry Pi based watchdog for temperature logging and intrus
 - Three door contact sensors
 - Configuration using /etc/tmon.conf config file
 - Threaded sensor reading for quick response
-- Notifications can be sent by mail
+- Notifications can be sent by mail and SMS using Twilio account
 - Send notification (alert) when sensor is triggers by threshold temperatures
 - Send another notification when sensor values are restored
 - Send another notification when a sensor is removed from the RPi
@@ -30,6 +30,9 @@ tmon implements a Raspberry Pi based watchdog for temperature logging and intrus
 
 ## Schematic##
 ![schematic](schema/2015-05-24%20tmon_schem.png?raw=true)
+
+## Breadboard##
+![breadboard](schema/2015-05-24%tmon_bb.png?raw=true)
 
 ## Database##
 MySQL Database on the Raspberry Pi with the 'log' table in this form:
