@@ -39,13 +39,13 @@ tmon implements a Raspberry Pi based watchdog for temperature logging and intrus
 - database name = 'tmon'
 - table 'log' has te be created manually for now:
 
-    +----------+-------------+------+-------+---------------------+
-    |Field     |Type         | Null | Key   | Default Extra       |
-    +----------+-------------+------+-------+---------------------|
-    |id        |int(11)      | NO   | PRI   | NULL auto_increment |
-    |timestamp |datetime     | YES  | NULL  |                     |
-    |type      |char(1)      | YES  | NULL  |                     |
-    |sensor    |varchar(20)  | YES  | NULL  |                     |
-    |value     |decimal(4,1) | YES  | NULL  |                     |
-    +----------+-------------+------+-------+---------------------+
+                +----------+-------------+------+-------+---------------------+
+                |Field     |Type         | Null | Key   | Default Extra       |
+                +----------+-------------+------+-------+---------------------|
+                |id        |int(11)      | NO   | PRI   | NULL auto_increment |
+                |timestamp |datetime     | YES  | NULL  |                     |
+                |type      |char(1)      | YES  | NULL  |                     |
+                |sensor    |varchar(20)  | YES  | NULL  |                     |
+                |value     |decimal(4,1) | YES  | NULL  |                     |
+                +----------+-------------+------+-------+---------------------+
 
