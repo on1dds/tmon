@@ -1,0 +1,25 @@
+#! /bin/sh
+# /etc/init.d/tmon
+#
+
+# Some things that run always
+touch /var/lock/tmon
+
+# Carry out specific functions when asked to by the system
+case "$1" in
+  start)
+    echo "Starting tmon"
+    pkill -2 tmon.py
+    exec /data/tmon/bin/tmon.py &
+    ;;
+  stop)
+    echo "Stopping tmon"
+    pkill -2 tmon.py
+    ;;
+  *)
+    echo "Usage: /etc/init.d/tmon {start|stop}"
+    exit 1
+    ;;
+esac
+
+exit 0

@@ -4,11 +4,9 @@
 #
 import logging
 import sensors
+import messages
 
-CONTACTSTATUS = ("OPEN", "CLOSED")
-STATUS_OPEN = 0
-STATUS_CLOSED = 1
-STATUS_DISCONNECTED = 2
+
 
 
 #
@@ -29,23 +27,9 @@ dbuser = "root"  # config database user
 dbpass = "pi"  # config database password
 keeplog = "10"  # config days to keep logs
 
-notifications = []
 aliases = []
 
 
-class Notification:
-    """Notification class"""
-
-    def __init__(self):
-        self.sensor = ""
-        self.threshold = 0
-        self.pinstate = STATUS_OPEN
-        self.error = False
-        self.mailto = ""
-        self.subject = ""
-        self.msgfault = ""
-        self.msgrestore = ""
-        self.issent = False
 
 
 def getalias(address):
@@ -58,8 +42,7 @@ def getalias(address):
 def readconfig(filename):
     global deviceid, mail_address, mailuser, mailpass, smtp
     global dbserver, dbname, dbuser, dbpass, keeplog
-    global notifications
-
+    
     _cfg = open(filename, 'r')  # open the config file
     rows = _cfg.readlines()  # and read all lines
     _cfg.close()
@@ -86,43 +69,46 @@ def readconfig(filename):
             elif arg[0] == "dbuser":   dbuser = arg[1]
             elif arg[0] == "dbpass":   dbpass = arg[1]
             elif arg[0] == "keeplog":  keeplog = arg[1]
+            elif arg[0] == "account_sid": messages.account_sid = arg[1]
+            elif arg[0] == "auth_token": messages.auth_token = arg[1]
+            elif arg[0] == "twilio_from": messages.twilio_from = arg[1]
 
             # notifications
             elif arg[0] == "notify":
                 # thermometer notifications configuration
                 if len(arg) == 7 and arg[2] == 'above':
-                    _n = Notification()
+                    _n = messages.New()
                     _n.sensor = arg[1]
                     _n.threshold = float(arg[3])
-                    _n.mailto = arg[4]
+                    _n.sendto = arg[4]
                     _n.msgfault = arg[5]
                     _n.msgrestore = arg[6]
                     _n.issent = False
-                    notifications.append(_n)
+                    messages.list_.append(_n)
 
                 # contact notifications configuration
                 elif len(arg) == 6 and (arg[2] == 'closed' or arg[2] == 'open'):
-                    _n = Notification()
+                    _n = messages.New()
                     _n.sensor = arg[1]
-                    if arg[2] == 'closed': _n.pinstate = STATUS_CLOSED
-                    elif arg[2] == 'open': _n.pinstate = STATUS_OPEN
-                    _n.mailto = arg[3]
+                    if arg[2] == 'closed': _n.pinstate = sensors.STATUS_CLOSED
+                    elif arg[2] == 'open': _n.pinstate = sensors.STATUS_OPEN
+                    _n.sendto = arg[3]
                     _n.msgfault = arg[4]
                     _n.msgrestore = arg[5]
                     _n.issent = False
-                    notifications.append(_n)
+                    messages.list_.append(_n)
 
                 # disconnect notification configuration
                 elif len(arg) == 6 and arg[2] == 'disconnected':
-                    _n = Notification()
+                    _n = messages.New()
                     _n.sensor = arg[1]
-                    _n.pinstate = STATUS_DISCONNECTED
-                    _n.mailto = arg[3]
+                    _n.pinstate = sensors.STATUS_DISCONNECTED
+                    _n.sendto = arg[3]
                     _n.msgfault = arg[4]
                     _n.msgrestore = arg[5]
                     _n.error = False
                     _n.issent = False
-                    notifications.append(_n)
+                    messages.list_.append(_n)
             else:
                 logging.warning("unknown config parameter:" + arg[0])
 

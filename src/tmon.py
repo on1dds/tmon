@@ -15,8 +15,9 @@ import db
 import sensors
 import tools
 import lcd
+import messages
 
-version_ = "v0.9"
+version_ = "v1.0"
 
 def terminate(msg):
     logging.warning(msg)
@@ -100,9 +101,9 @@ def main():
                             _sensor.lastvalue = _sensor.value
                             _sensor.lasttime = now
 
-        """ status output """
-        # send notifications
-        tools.sendnotifications()
+
+        # send notifications by e-mail or sms
+        messages.handle()
         
         # blink standby LED
         if now > wait_blink:
@@ -112,7 +113,7 @@ def main():
         
         # control error LED
         e_ = 0
-        for _n in config.notifications:
+        for _n in messages.list_:
             if _n.error: e_ += 1
         GPIO.output(LED_ERROR, e_ > 0)
 
@@ -165,7 +166,10 @@ except MySQLError:
 
 time.sleep(3)
 
-main()
+try:
+    main()
+except:
+    pass
 
 log.close()
 GPIO.output(LED_OK, False)
