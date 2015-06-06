@@ -4,17 +4,17 @@
 #
 import os
 import sys
-from twilio.rest import TwilioRestClient
+import RPi.GPIO as GPIO
 
-ACCOUNT_SID = "AC8ea0cd070e2264607023c953bfa5d90e"
-AUTH_TOKEN = "05e87d88da3893c846226dcb5d557d2c"
-TEXT_FROM = "+32460201234"
-TEXT_TO = "+32484440957"
+os.system('modprobe w1-gpio')
+os.system('modprobe w1-therm')
 
-client = TwilioRestClient(ACCOUNT_SID, AUTH_TOKEN) 
+# init GPIO ports
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(9, GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(10, GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 
-client.messages.create(
-    to= TEXT_TO, 
-    from_=TEXT_FROM, 
-    body="Hello there",  
-)
+while(True):
+    a = GPIO.input(9)
+    b = GPIO.input(10)
+    print("9=" + str(a) + ", 10=" + str(b))

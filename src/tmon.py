@@ -19,12 +19,20 @@ import messages
 
 version_ = "v1.0"
 
+class Msg:
+    """ error messages """
+    def __init__(self):
+        self.name = ""
+        self.msg = ""
+        
 def terminate(msg):
     logging.warning(msg)
     sys.exit()
 
 
 def main():
+    global btn_down, btn_isDown, btn_up, btn_isUp
+    global errorlist, errorindex
     # initialize event intervals
     #
     now = time.time()
@@ -36,11 +44,13 @@ def main():
     UNSAVED_MAX = 60 * 60 * 1
     DELAY_THERMPOLL = 5
     DELAY_DISPLAY = 3
+    DELAY_ERRDISP = 5
     
     wait_thermpoll = now
     wait_clearlog = now
     wait_blink = now
     wait_display = now
+    wait_errdisp = 0
 
     okledstatus = False
 
@@ -112,14 +122,36 @@ def main():
             okledstatus = not okledstatus
         
         # control error LED
-        e_ = 0
+        errorlist = []
         for _n in messages.list_:
-            if _n.error: e_ += 1
-        GPIO.output(LED_ERROR, e_ > 0)
+            _msg = Msg()
+            _msg.name = _n.sensor
+            _msg.msg = _n.msgfault
+            if _n.error: errorlist.append(_msg)
+        
+        GPIO.output(LED_ERROR, len(errorlist) > 0)
 
+        # check press on up button
+        if not btn_isUp:
+            if GPIO.input(btn_up):
+                btn_isUp = True
+                wait_errdisp = now
+                errorindex += 1
+                if errorindex >= len(errorlist):
+                    errorindex = 0
+        else:
+            btn_isUp = GPIO.input(btn_up)
+
+        # display errormessage on LCD
+        if now < (wait_errdisp + DELAY_ERRDISP): 
+            if len(errorlist) > 0:
+                lcd.writeline(errorlist[errorindex].name,1)
+                lcd.writeline(errorlist[errorindex].msg,2)
         # show thermometers on display
-        if now > wait_display:
-            wait_display += DELAY_DISPLAY
+        elif now > wait_display:
+            errorindex = 0
+            while now > wait_display:
+                wait_display += DELAY_DISPLAY
             _list = sensors.getlist(sensors.TYPE_THERMOMETER)
             if lcdindex < len(_list):
                 _sensor = _list[lcdindex]
@@ -128,12 +160,10 @@ def main():
             else:
                 _msg = tools.getipaddress()
                 lcdindex = 0
+            lcd.writeline("tmon " + version_,1)
             lcd.writeline(_msg, 2)
 
-LED_OK = 25
-LED_ERROR = 12
-errorled = 0
-
+            
 log = db.SQLLog()
 
 # init GPIO
@@ -146,13 +176,28 @@ lcd.init()
 lcd.writeline("tmon " + version_, 1)
 lcd.writeline("initializing ...", 2)
 
-# init LEDs
-GPIO.setup(LED_OK, GPIO.OUT)
+# error handling I/O
+LED_OK = 25
+LED_ERROR = 12
+errorlist = []
+errorindex = 0
+
+errorled = GPIO.setup(LED_OK, GPIO.OUT)
 GPIO.setup(LED_ERROR, GPIO.OUT)
 GPIO.output(LED_ERROR,True)
 GPIO.output(LED_OK,True)
 
+# init buttons
+btn_up = 10
+btn_down = 9
+btn_isUp = False
+btn_isDown = False
+GPIO.setup(btn_down, GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(btn_up,   GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
+
+# read config
 config.readconfig("/etc/tmon.conf")
+
 
 # create sensors list and start sensors updating threads
 sensors.init()
@@ -166,10 +211,8 @@ except MySQLError:
 
 time.sleep(3)
 
-try:
-    main()
-except:
-    pass
+
+main()
 
 log.close()
 GPIO.output(LED_OK, False)

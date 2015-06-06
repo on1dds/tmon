@@ -6,17 +6,18 @@ tmon implements a Raspberry Pi based watchdog for temperature logging and intrus
 - Three door contact sensors
 - Configuration using /etc/tmon.conf config file
 - Threaded sensor reading for quick response
-- Notifications can be sent by mail and SMS using Twilio account
-- Send notification (alert) when sensor is triggers by threshold temperatures
-- Send another notification when sensor values are restored
-- Send another notification when a sensor is removed from the RPi
+- Notifications (alerts) can be sent by e-mail and SMS (using Twilio account)
+- Send notification when a sensor is triggers by threshold temperatures
+- Send notification when a sensor values are restored
+- Send notification when a sensor is removed from the RPi
 - Each notification can be sent to another addressee
 - notifications can be double, tripled, ...
-- Error conditons are shown by an indicator LED
+- Error conditons are shown by an indicator LED and on 2x16 LCD display
 - Blinking LED to show tmon is still running
-- Can be used headless because of 2x16 LCD display which displays IP-address (helpfull in case of DHCP)
+- shows IP address on startup(helpfull in case of DHCP)
 - temperature monitoring via 2x16 LCD display
-- sensor logging in MySQL database on the Pi
+- Cycle through error messages on LCD display using push button
+- sensor status logging in MySQL database on the Pi
 - Log can be viewed via webpage
 - sensor data graphics shown on webpage using PHP
 
@@ -27,6 +28,14 @@ tmon implements a Raspberry Pi based watchdog for temperature logging and intrus
 - Programming on Windows in Notepad++
 - Uploaded files using samba
 - Written for Python 2.7.3.
+
+## GPIO ports used ##
+- GPIO4: onewire hub for DS18B20 thermometers
+- GPIO17+27+22: contact1+2+3
+- GPIO26+12: LEDs red+green
+- GPIO14+15+18+23: LCD DB4-7 datalines
+- GPIO7+8: LCD RS+E
+- GPIO9+10: 2 pushbuttons
 
 ## Schematic##
 schematics are drawn with [Fritzing.0.9.1b](http://fritzing.org/)

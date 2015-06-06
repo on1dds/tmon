@@ -42,7 +42,7 @@ def sendsms(_n, body):
         client.messages.create(
             to= _n.sendto, 
             from_= twilio_from, 
-            body= body,  
+            body= config.hostname + " " + _n.sensor + " " + body,  
         )
     except twilio.rest.exceptions.TwilioRestException:
         logging.warning("number " + _n.sendto + " is not a valid, SMS capable phone number")
@@ -56,7 +56,7 @@ def sendsms(_n, body):
 
 
 def sendemail(_n, body):
-    content = "From: <" + config.mail_address + ">\n"
+    content = "From: " + config.hostname + " " + _n.sensor + "<" + config.mail_address + ">\n"
     content += "To: <" + _n.sendto + ">\n"
     content += "Subject: " + body + "\n\n"
     

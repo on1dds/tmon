@@ -6,12 +6,10 @@ import logging
 import sensors
 import messages
 
-
-
-
 #
 # tmon mail settings
 #
+hostname = ""  # friendly name to use in mail address
 deviceid = ""  # config name of the device. Not used yet
 mail_address = ""  # config sender address
 mailuser = ""  # config username
@@ -41,7 +39,7 @@ def getalias(address):
 
 def readconfig(filename):
     global deviceid, mail_address, mailuser, mailpass, smtp
-    global dbserver, dbname, dbuser, dbpass, keeplog
+    global dbserver, dbname, dbuser, dbpass, keeplog, hostname
     
     _cfg = open(filename, 'r')  # open the config file
     rows = _cfg.readlines()  # and read all lines
@@ -57,6 +55,7 @@ def readconfig(filename):
                 sensors.aliases.append(_alias)
 
             # mailing configuration options
+            elif arg[0] == "hostname": hostname = arg[1]
             elif arg[0] == "smtp": smtp = arg[1]
             elif arg[0] == "mail-address": mail_address = arg[1]
             elif arg[0] == "mailuser": mailuser = arg[1]
