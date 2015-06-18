@@ -1,6 +1,5 @@
 #!/usr/bin/python
-#
-# tmon - configuration
+""" tmon - configuration loader and interpreter """
 #
 import logging
 import sensors
@@ -8,9 +7,7 @@ import messages
 
 #
 # tmon mail settings
-#
-hostname = ""  # friendly name to use in mail address
-deviceid = ""  # config name of the device. Not used yet
+hostname = ""  # config name of the device. Not used yet
 mail_address = ""  # config sender address
 mailuser = ""  # config username
 mailpass = ""  # config password
@@ -19,27 +16,20 @@ smtp = ""  # config smtp servername
 #
 # database parameters
 #
-dbserver = "localhost"  # config database server address
-dbname = "tmon"  # config database name
-dbuser = "root"  # config database user
-dbpass = "pi"  # config database password
-keeplog = "10"  # config days to keep logs
+db_server = "localhost"  # config database server address
+db_name = "tmon"  # config database name
+db_user = "root"  # config database user
+db_pass = "pi"  # config database password
+db_logexpire = "10"  # config days to keep logs
 
 aliases = []
 
 
 
-
-def getalias(address):
-    for _alias in sensors.aliases:
-        if _alias.address == address:
-            return _alias.name
-    return address
-
-
 def readconfig(filename):
-    global deviceid, mail_address, mailuser, mailpass, smtp
-    global dbserver, dbname, dbuser, dbpass, keeplog, hostname
+    """ read config file and load into program """
+    global mail_address, mailuser, mailpass, smtp
+    global db_server, db_name, db_user, db_pass, db_logexpire, hostname
     
     _cfg = open(filename, 'r')  # open the config file
     rows = _cfg.readlines()  # and read all lines
@@ -62,12 +52,12 @@ def readconfig(filename):
             elif arg[0] == "mailpass": mailpass = arg[1]
 
             # database configuration options
-            elif arg[0] == "dbserver": dbserver = arg[1]
+            elif arg[0] == "db_server": db_server = arg[1]
             elif arg[0] == "disable":  sensors.disabled_sensors.append(arg[1])
-            elif arg[0] == "dbname":   dbname = arg[1]
-            elif arg[0] == "dbuser":   dbuser = arg[1]
-            elif arg[0] == "dbpass":   dbpass = arg[1]
-            elif arg[0] == "keeplog":  keeplog = arg[1]
+            elif arg[0] == "db_name":   db_name = arg[1]
+            elif arg[0] == "db_user":   db_user = arg[1]
+            elif arg[0] == "db_pass":   db_pass = arg[1]
+            elif arg[0] == "db_expire":  db_logexpire = arg[1]
             elif arg[0] == "account_sid": messages.account_sid = arg[1]
             elif arg[0] == "auth_token": messages.auth_token = arg[1]
             elif arg[0] == "twilio_from": messages.twilio_from = arg[1]
@@ -77,7 +67,7 @@ def readconfig(filename):
                 # thermometer notifications configuration
                 if len(arg) == 7 and arg[2] == 'above':
                     _n = messages.New()
-                    _n.sensor = arg[1]
+                    _n.sensor_name = arg[1]
                     _n.threshold = float(arg[3])
                     _n.sendto = arg[4]
                     _n.msgfault = arg[5]
@@ -88,7 +78,7 @@ def readconfig(filename):
                 # contact notifications configuration
                 elif len(arg) == 6 and (arg[2] == 'closed' or arg[2] == 'open'):
                     _n = messages.New()
-                    _n.sensor = arg[1]
+                    _n.sensor_name = arg[1]
                     if arg[2] == 'closed': _n.pinstate = sensors.STATUS_CLOSED
                     elif arg[2] == 'open': _n.pinstate = sensors.STATUS_OPEN
                     _n.sendto = arg[3]
@@ -96,45 +86,45 @@ def readconfig(filename):
                     _n.msgrestore = arg[5]
                     _n.issent = False
                     messages.list_.append(_n)
-
+                    
                 # disconnect notification configuration
                 elif len(arg) == 6 and arg[2] == 'disconnected':
                     _n = messages.New()
-                    _n.sensor = arg[1]
+                    _n.sensor_name = arg[1]
                     _n.pinstate = sensors.STATUS_DISCONNECTED
                     _n.sendto = arg[3]
                     _n.msgfault = arg[4]
                     _n.msgrestore = arg[5]
                     _n.error = False
                     _n.issent = False
-                    messages.list_.append(_n)
+                    messages.list_.append(_n)    
             else:
                 logging.warning("unknown config parameter:" + arg[0])
 
-
 def _parse(line):
+    """ parse config lines """
     chars = []
-    for c in line:
-        chars.append(c)
+    for _c in line:
+        chars.append(_c)
 
     inquote = False
-    for x in range(0, len(chars)):
-        if chars[x] == '"' or chars[x] == '\r':
-            chars[x] = '\n'
+    for _x in range(0, len(chars)):
+        if chars[_x] == '"' or chars[_x] == '\r':
+            chars[_x] = '\n'
             inquote = not inquote
-        if not inquote and (chars[x] == ' ' or chars[x] == '\t'):
-            chars[x] = '\n'
+        if not inquote and (chars[_x] == ' ' or chars[_x] == '\t'):
+            chars[_x] = '\n'
 
     _lastwasn = False
-    s = ""
-    for x in range(0, len(chars)):
-        if chars[x] != '\n':
-            s += chars[x]
+    _s = ""
+    for _x in range(0, len(chars)):
+        if chars[_x] != '\n':
+            _s += chars[_x]
             _lastwasn = False
-        elif chars[x] == '\n':
+        elif chars[_x] == '\n':
             if not _lastwasn:
-                s += '\n'
+                _s += '\n'
                 _lastwasn = True
-    while s[len(s) - 1:] == '\n':
-        s = s[:len(s) - 1]
-    return s.split('\n')
+    while _s[len(_s) - 1:] == '\n':
+        _s = _s[:len(_s) - 1]
+    return _s.split('\n')

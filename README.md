@@ -45,14 +45,14 @@ schematics are drawn with [Fritzing.0.9.1b](http://fritzing.org/)
 ![breadboard](schema/tmon_bb.png?raw=true)
 
 ## Database##
-- data are stored in MySQL database directly on the Raspberry Pi.
-- database name = 'tmon'
-- table 'log' has te be created manually for now:
+- data are stored in local MySQL database.
+- database created = 'tmon'
+- table created = 'log' and looks like this:
 
                 +----------+-------------+------+-------+---------------------+
                 |Field     |Type         | Null | Key   | Default Extra       |
                 +----------+-------------+------+-------+---------------------|
-                |id        |int(11)      | NO   | PRI   | NULL auto_increment |
+                |id        |int          | NO   | PRI   | NULL auto_increment |
                 |timestamp |datetime     | YES  | NULL  |                     |
                 |type      |char(1)      | YES  | NULL  |                     |
                 |sensor    |varchar(20)  | YES  | NULL  |                     |

@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""
 # --------------------------------------
 #    ___  ___  _ ____
 #   / _ \/ _ \(_) __/__  __ __
@@ -35,12 +36,10 @@
 # 14: Data Bit 7
 # 15: LCD Backlight +5V**
 # 16: LCD Backlight GND
+"""
 
-# import
 import time
-
 import RPi.GPIO as GPIO
-
 
 # Define GPIO to LCD mapping
 LCD_RS = 7
@@ -69,7 +68,7 @@ E_DELAY = 0.0005
 
 
 def init():
-    # setup GPIO
+    """ setup GPIO """
     # GPIO.setmode(GPIO.BCM)       # Use BCM GPIO numbers
     GPIO.setup(LCD_E, GPIO.OUT)  # E
     GPIO.setup(LCD_RS, GPIO.OUT)  # RS
@@ -89,20 +88,24 @@ def init():
 
 
 def clear():
-    char(0x01)  # 000001 Clear display
+    """ clear display """
+    char(0x01)
 
 
 def cmd(data):
+    """ send command to display """
     GPIO.output(LCD_RS, LCD_CMD)
     writedigit(data)
 
 
 def char(data):
+    """ send character to display """
     GPIO.output(LCD_RS, LCD_CHR)
     writedigit(data)
 
 
 def writedigit(data):
+    """ write databyte to display """
     # High bits
     GPIO.output(LCD_D4, data & 0x10 != 0)
     GPIO.output(LCD_D5, data & 0x20 != 0)
@@ -119,7 +122,7 @@ def writedigit(data):
 
 
 def lcd_toggle_enable():
-    # Toggle enable
+    """ Toggle enable """
     time.sleep(E_DELAY)
     GPIO.output(LCD_E, True)
     time.sleep(E_PULSE)
@@ -128,10 +131,8 @@ def lcd_toggle_enable():
 
 
 def writeline(message, line):
-    # Send string to display
+    """ Send string to display """
     message = message.ljust(LCD_WIDTH, " ")
-
     cmd(LCD_LINE[line - 1])
-
     for i in range(LCD_WIDTH):
         char(ord(message[i]))
