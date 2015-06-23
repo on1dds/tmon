@@ -1,26 +1,22 @@
 #!/usr/bin/python
-""" tmon - temperature and contact watchdog """
-import os
+""" tmon - temperature and contact watchdog 
+"""
 import sys
 import time
 import MySQLdb
 import RPi.GPIO as GPIO
+import collections
 
-# import sub programs
-import config
+# import local modules
 import db
 import sensors
 import lcd
-import messages
-from tmglob import *
+import alerts
+from globals import *
 
-version_ = "v1.0"
+__version__ = "v1.01"
 
-class Msg(object):
-    """ error messages structure """
-    def __init__(self):
-        self.name = ""
-        self.msg = ""
+message = collections.namedtuple('message','name msg')
 
 def log_contacts():
     """ if contact status changes, log to database """
@@ -29,10 +25,10 @@ def log_contacts():
             (_s.value != _s.lastvalue):
             if _s.lastvalue != -100:
                 log.write(_s.type, \
-                    sensors.getalias(_s.address), \
+                    config_getname(_s.address), \
                     _s.lastvalue)
             _val = _s.value
-            log.write(_s.type, sensors.getalias(_s.address), _val)
+            log.write(_s.type, config_getname(_s.address), _val)
             _s.lastvalue = _val
             _s.lasttime = now
     return True
@@ -43,18 +39,14 @@ def log_temp_changes():
     for _s in sensors.getlist(sensors.TYPE_THERMOMETER):
         # save all temperatures at least once every UNSAVED_MAX seconds
         if (_s.lasttime + UNSAVED_MAX) < now:
-            log.write(_s.type, \
-                sensors.getalias(_s.address), \
-                _s.value)
+            log.write(_s.type, config_getname(_s.address), _s.value)
             _s.lastvalue = _s.value
             _s.lasttime = now
             
         # handle system thermometer
         elif _s.address == 'system':
             if abs(_s.lastvalue - _s.value) > .3:
-                log.write(_s.type, \
-                    sensors.getalias(_s.address), \
-                    _s.value)
+                log.write(_s.type, config_getname(_s.address), _s.value)
                 _s.lastvalue = _s.value
                 _s.lasttime = now
                 
@@ -64,10 +56,10 @@ def log_temp_changes():
             if (abs(_s.lastvalue - _s.value) > .52) and \
                     (now - _s.lasttime > 60 * 5):
                 log.write(_s.type, \
-                    sensors.getalias(_s.address), \
+                    config_getname(_s.address), \
                     _s.lastvalue)
             log.write(_s.type, \
-                sensors.getalias(_s.address), \
+                config_getname(_s.address), \
                 _s.value)
             _s.lastvalue = _s.value
             _s.lasttime = now
@@ -76,10 +68,9 @@ def log_temp_changes():
 def get_errorlist():
     """ return list of all triggered notifications """
     errorlist = []
-    for _n in messages.list_:
-        _msg = Msg()
-        _msg.name = _n.sensor_name
-        _msg.msg = _n.msgfault
+    for _n in alerts.alerts_:
+        _msg = message(name=_n.sensor_name, msg=_n.msgfault)
+
         if _n.error: 
             errorlist.append(_msg)
 
@@ -123,58 +114,49 @@ def show_status():
         else:
             _msg = getipaddress()
             lcdindex = 0
-        lcd.writeline("tmon " + version_, 1)
+        lcd.writeline("tmon " + __version__, 1)
         lcd.writeline(_msg, 2)
 
 
-# init GPIO
-os.system('modprobe w1-gpio')  # enable using filesystem for GPIO access
-
+        
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 
 GPIO.setup(LED_OK, GPIO.OUT)        # init OK LED
 GPIO.output(LED_OK, True)
-
 GPIO.setup(LED_ERROR, GPIO.OUT)     # init ERROR LED
 GPIO.output(LED_ERROR, True)
 
 GPIO.setup(BTN_INFO, GPIO.IN, pull_up_down=GPIO.PUD_DOWN) # init info button
-
 btn_info_ispressed = False
 
 # init LCD display
 lcd.init()
-lcd.writeline("tmon " + version_, 1)
+lcd.writeline("tmon " + __version__, 1)
 lcd.writeline("initializing ...", 2)
 
 # error handling I/O
 errorindex = 0
 
-# init buttons
-
-
-# read config
-config.readconfig("/etc/tmon.conf")
-
-
 # create sensors list and start sensors updating threads
 sensors.init()
+
+alerts.read_from_config()
 
 # open mysql connection
 log = db.SQLLog()
 
-log.create_db(config.db_server, config.db_user, config.db_pass)
+log.create_db(cfg['db_server'], cfg['db_user'], cfg['db_pass'])
 
 
 try:
-    log.open(config.db_server, config.db_user, config.db_pass, config.db_name)
+    log.open(cfg['db_server'], cfg['db_user'], cfg['db_pass'], cfg['db_name'])
 except MySQLdb.MySQLError:
     lcd.writeline("err: opening db", 2)
     terminate("error opening database '" + \
-        config.db_name + \
+        cfg['db_name'] + \
         "from server '" + \
-        config.db_server + "'")
+        cfg['db_server'] + "'")
 
 time.sleep(3)
 
@@ -210,7 +192,7 @@ while True:
     # cleanup database
     if now > timer_clearlog:
         timer_clearlog += DELAY_CLEARLOG
-        log.clean(config.db_logexpire)
+        log.clean(cfg['db_expire'])
 
     # log contact sensor changes
     if now == now:
@@ -227,8 +209,8 @@ while True:
         okledstatus = not okledstatus 
         GPIO.output(LED_OK, okledstatus)
         
-    # send notifications by e-mail or sms
-    messages.handle()
+    # send alerts by e-mail or sms
+    alerts.update()
         
     # show status error messages
     show_status()

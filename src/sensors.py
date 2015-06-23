@@ -4,7 +4,7 @@ find, inventorize, read and update sensors by type
 """
 import os
 import glob
-from tmglob import *
+from globals import *
 import time
 import threading
 import RPi.GPIO as GPIO
@@ -20,34 +20,24 @@ TYPE_THERMOMETER = 'T'
 CONTACTSTATUS = ("OPEN", "CLOSED")
 STATUS_OPEN = 0
 STATUS_CLOSED = 1
-STATUS_DISCONNECTED = 2
+STATUS_FAULT = 2
 
 CONTACT = (22, 27, 17)
 
 list_ = []
 _systemp = []
 threads = []
-aliases = []
-disabled_sensors = []
 
 
 class Sensor:
     """ sensor definition """
-    def __init__(self, address):
+    def __init__(self, address, type_):
         self.address = address
-        self.type = -1
+        self.type = type_
         self.enabled = True
         self.value = 0
         self.lasttime = 0.0
         self.lastvalue = -100.0
-
-
-class Alias(object):
-    """ alternative names for sensor addresses """
-    def __init__(self):
-        self.address = ""
-        self.name = ""
-
 
 def init():
     """ Initialize sensors list and keep updated """
@@ -86,6 +76,38 @@ def getlist(type_):
     return _sensors
 
 
+    
+def isdisabled(_name):
+    """ check if sensor with given name is disabled by configuration """
+    config_getaddress(_name)
+    if _name in config_getdisabled():
+        return True
+    return False
+    
+def getname(_sensor):
+    """ find alias for """
+    return config_getname(_sensor.address)
+
+
+def find(_address): 
+    """ find sensor by address or alias """
+    
+    _address = config_getaddress(_address)
+
+    # find address
+    for _sensor in list_:
+        if _address == _sensor.address:
+            return _sensor
+
+    return None
+
+def getalias(address):
+    """ get alias of sensor address """
+    for _alias in cfg['alias'].items():
+        if address in _alias:
+            return _alias[1]
+    return address
+  
 def remove_(_address):
     """ remove sensor with given address from sensorlist """
     _sensor = find(_address)
@@ -94,52 +116,6 @@ def remove_(_address):
         return True
     return False
 
-    
-def isdisabled(_name):
-    """ check if sensor with given name is disabled by configuration """
-    if _name in disabled_sensors:
-        return True
-
-    for _alias in aliases:
-        if _name == _alias.name or _name == _alias.address:
-            if _alias.name in disabled_sensors:
-                return True
-            if _alias.address in disabled_sensors:
-                return True
-    return False
-
-    
-def getname(_sensor):
-    """ find alias for """
-    for _s in aliases:
-        if _sensor.address == _s.address:
-            return _s.name
-    return _sensor.address
-
-
-def find(address): 
-    """ find sensor by address or alias """
-    
-    # convert alias to address
-    for _alias in aliases:
-        if _alias.name == address:
-            address = _alias.address
-            break
-    
-    # find address
-    for _sensor in list_:
-        if address == _sensor.address:
-            return _sensor
-
-    return None
-
-def getalias(address):
-    """ get alias of sensor address """
-    for _alias in aliases:
-        if _alias.address == address:
-            return _alias.name
-    return address
-  
 def thread_terminate():
     """ exit the current thread """
     for _t in threads:
@@ -156,9 +132,7 @@ class UpdateContacts(threading.Thread):
     def run(self):
         for _address in range(3):
             if not isdisabled(str(_address)):
-                _s = Sensor(str(_address))
-                _s.type = TYPE_CONTACT
-                list_.append(_s)
+                list_.append(Sensor(str(_address), TYPE_CONTACT))
                 
         while True:
             for _sensor in getlist(TYPE_CONTACT):
@@ -181,8 +155,7 @@ def _update_temps(_thermometerlist):
     # create system thermometer if not exists
     _sensor = find('system')
     if not _sensor:
-        _sensor = Sensor('system')
-        _sensor.type = TYPE_THERMOMETER
+        _sensor = Sensor('system', TYPE_THERMOMETER)
         list_.append(_sensor)
     
     # read system temperature
@@ -200,14 +173,11 @@ def _update_temps(_thermometerlist):
         
 class UpdateThermometers(threading.Thread):
     """ thread for keeping thermometers up-to-date"""
-    global _update_temps
-    
     def __init__(self):
         self.go = False
         threading.Thread.__init__(self)
         
- 
-    
+
     def run(self):
         while True:
             # read existing w1 thermometers
@@ -215,8 +185,8 @@ class UpdateThermometers(threading.Thread):
             
             for _t in _thermometerlist:
                 _address = _t[20:]             # extract thermometer address
-                
                 _valid = False
+                
                 # only enabled addresses
                 if not isdisabled(_address):
                     # read thermometer
@@ -236,26 +206,13 @@ class UpdateThermometers(threading.Thread):
                             _sensor = find(_address)
                             if _value < 80:
                                 if not _sensor: 
-                                    _sensor = Sensor(_address)
-                                    _sensor.type = TYPE_THERMOMETER
+                                    _sensor = Sensor(_address, TYPE_THERMOMETER)
                                     list_.append(_sensor)
                                 _sensor.value = _value
-                            else:
-                                remove_(_address)
-                        else:
-                            remove_(_address)
-                    else:
-                        remove_(_address)
-                else:
+                                _valid = True
+                if _valid == False:
                     remove_(_address)
-
+                    
             _update_temps(_thermometerlist)
-            
             time.sleep(DELAY_THERMOMETERS)
             self.go = True
-
-
-
-        
-        
-        

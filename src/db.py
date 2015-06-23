@@ -8,7 +8,7 @@ import lcd
 import sys
 from warnings import filterwarnings
 
-filterwarnings('ignore',category = MySQLdb.Warning)
+filterwarnings('ignore', category = MySQLdb.Warning)
 
 class SQLLog:
     """ TMon Log SQL Connector"""
@@ -24,25 +24,25 @@ class SQLLog:
         try:
             self.db = MySQLdb.connect(db_server, db_user, db_pass)
             cursor = self.db.cursor() 
-        except MySQLdb.Warning, e:
-            lcd.writeline("DB open warning",1)
-            lcd.writeline("OK",2)
-        except MySQLdb.Error, e:
-            lcd.writeline("DB open failed:",1)
-            lcd.writeline("TMON Stopped",2)            
+        except MySQLdb.Warning:
+            lcd.writeline("DB open warning", 1)
+            lcd.writeline("OK", 2)
+        except MySQLdb.Error:
+            lcd.writeline("DB open failed:", 1)
+            lcd.writeline("TMON Stopped", 2)            
             sys.exit(1)
 
 
         try:
             cursor.execute("CREATE DATABASE IF NOT EXISTS tmon")
-            cursor.execute("USE tmon");
-        except MySQLdb.Warning, e:
-            lcd.writeline("DB create warn",1)
-            lcd.writeline("OK",2)
+            cursor.execute("USE tmon")
+        except MySQLdb.Warning:
+            lcd.writeline("DB create warn", 1)
+            lcd.writeline("OK", 2)
 
-        except MySQLdb.Error, e:
-            lcd.writeline("DB create fault:",1)
-            lcd.writeline("Failed",2)  
+        except MySQLdb.Error:
+            lcd.writeline("DB create fault:", 1)
+            lcd.writeline("Failed", 2)  
             self.db.rollback()
             self.db.close()
             sys.exit(1)
@@ -58,13 +58,13 @@ class SQLLog:
                 "sensor VARCHAR(20),"
                 "value DECIMAL(4,1)"
                 ") "))        
-        except MySQLdb.Warning, e:
-            lcd.writeline("DB create table",1)
-            lcd.writeline("OK",2)
+        except MySQLdb.Warning:
+            lcd.writeline("DB create table", 1)
+            lcd.writeline("OK", 2)
                 
-        except MySQLdb.Error, e:
-            lcd.writeline("DB new table",1)
-            lcd.writeline("Failed: Stopped",2)
+        except MySQLdb.Error:
+            lcd.writeline("DB new table", 1)
+            lcd.writeline("Failed: Stopped", 2)
             self.db.rollback()
             self.db.close()
             sys.exit(1)       
@@ -95,6 +95,7 @@ class SQLLog:
 
     def clean(self, period):
         """ clean up old logs """
+        period = str(period)
         query = "DELETE FROM log WHERE timestamp < (NOW() - INTERVAL " + \
             period + " day)"
         cursor = self.db.cursor()
