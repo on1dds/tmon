@@ -3,37 +3,35 @@
 #
 
 sensors = (
-    {'address': '10-0008256eeff',
+    {'address': '10-00080256eeff',
         'name': 'dataroom',
-        'disable': True,
         'alerts': (
-            [">25",   "+123456789012",      ">25'C", "Ok, <25'C"],
-            [">25",   "me@myprovider.be", ">25'C", "Ok, <25'C"],
-            [">25",   "me@myprovider.be", ">25'C", "Ok, <25'C"],
-            ["fault", "+123456789012",      "sensor fault", "Ok, sensor restored"]
+            [">27",   "+01234567890", ">25'C", "Ok, <25'C"],
+            [">27",   "me@home.net", ">25'C", "Ok, <25'C"],
+            ["fault", "me@home.net", "sensor fout", "Ok, sensor fout hersteld"]
         )
     },
     
     {'address': '10-000802deb843',
         'name': 'rack',
         'alerts': (
-            [">30",   "me@myprovider.be", "BEWARE: >30'C", "Ok, <30'C"],
+            [">30",   "me@home.net", "BEWARE: >30'C", "Ok, <30'C"],
             []
         )
     },
 
     {'address': '0',
-        'name': 'roomdoor',
-        'attach': 'http://192.168.1.45/snapshot.cgi?user=login&pwd=password',
+        'name': 'lokaaldeur',
+        'attach': 'http://10.0.100.20:8080/snapshot.cgi?user=login&pwd=password',
         'alerts': (
-            ["open",   "+123456789012", "door is open", "Ok, door is closed"],       
-            ["open",   "me@myprovider.be", "door is open", "Ok, door is closed"]
+            ["open",   "+01234567890", "deur is open", "Ok, deur is dicht"],       
+            ["open",   "me@home.net", "deur is open", "Ok, deur is dicht"]
         )
     },
     
     {'address': 'system',
         'alerts': (
-            [">50",   "+123456789012", "WARNING: System overheating", "Ok, System temp normalized"],
+            [">50",   "+01234567890", "WARNING: System overheating", "Ok, Systemp normalized"],
             []
         )
     },       
@@ -49,18 +47,20 @@ db_server       = "localhost"
 db_name         = "tmon"
 db_user         = "root"
 db_pass         = "pi"
-db_expire       = 240           # hours to keep log in database
+db_expire       = 24           # hours to keep log in database
 
 # mail setup
 hostname        = "tmon"
-mail_address    = "tmon@provider.com"
-mail_server     = "smtp.provider.com"
-mail_user       = "login"
-mail_pass       = "password"
+mail_address    = "tmon@gmail.com"
+mail_server     = "smtp.gmail.com"
+mail_user       = "tmon@gmail.com"
+mail_pass       = "zbj6e3rZez6bNYvQcFM"
+mail_tls	= True
+mail_port	= 587
 
 # SMS setup    
-twilio_account_sid  = "AC8*******************************"
-twilio_auth_token   = "05****************************2c"
-twilio_number       = "+1***********"
+twilio_account_sid  = "AC********************************"
+twilio_auth_token   = "05******************************"
+twilio_number       = "+5553809123"
 
 

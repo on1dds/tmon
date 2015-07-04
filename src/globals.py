@@ -19,7 +19,7 @@ BTN_INFO =  10
 # BTN_DOWN = 9
 
 cfg = {}
-execfile("etc/tmonconf.py", cfg)
+execfile("/etc/tmon/tmonconf.py", cfg)
 
 
 def getipaddress():

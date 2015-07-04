@@ -136,3 +136,7 @@ def writeline(message, line):
     cmd(LCD_LINE[line - 1])
     for i in range(LCD_WIDTH):
         char(ord(message[i]))
+        
+def show(line1, line2):
+    writeline(line1, 1)
+    writeline(line2, 2)

@@ -6,11 +6,13 @@ from twilio.rest import TwilioRestClient
 import twilio
 import sensors
 import smtplib
-import logging
+import tlog
+import lcd
 import re as regex
 import urllib2
 from time import strftime
 from globals import *
+
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
@@ -93,12 +95,11 @@ class Alert(object):
                 body= cfg['hostname'] + " " + self.sensor_name + " " + body,  
             )
         except twilio.rest.exceptions.TwilioRestException:
-            logging.warning("number " + self.sendto + \
-                " is not a valid, SMS capable phone number")
+            lcd.show(self.sendto, "not SMS capable")  
             return False
         
         except twilio.rest.exceptions:
-            logging.warning("twilio SMS error")
+            lcd.show("Error:","Twilio SMS fault")
             return False
 
         return True
@@ -115,24 +116,33 @@ class Alert(object):
         msg['Subject'] = body
         msg.attach(MIMEText(body, 'plain'))
 
-        filename = strftime("%y%m%d_%H%M%S") + ".jpg"
-
-        url = "http://192.168.1.21/snapshot.cgi?user=admin&pwd=cheyenne"
-        a = MIMEImage(urllib2.urlopen(url).read(),'jpeg')
-        a.add_header('Content-Disposition', 'attachment', filename=filename)
-        msg.attach(a)
+        # attach snapshot
+        _addr = config_getaddress(self.sensor_name)
+        _s = [s for s in cfg['sensors'] if 'address' in s and s['address'] == _addr]
+        a = [a['attach'] for a in _s if 'attach' in a]
+        if len(a) == 1:
+            url = a[0]
+            filename = strftime("%y%m%d_%H%M%S") + ".jpg"
+            a = MIMEImage(urllib2.urlopen(url).read(),'jpeg')
+            a.add_header('Content-Disposition', 'attachment', filename=filename)
+            msg.attach(a)
         
-        try:
-            _mailserver = smtplib.SMTP(cfg['mail_server'])
-            _mailserver.sendmail(cfg['mail_address'], self.sendto, msg.as_string())
-            _mailserver.quit()
-            return True
-        except smtplib.SMTPRecipientsRefused:
-            logging.warning("invalid e-mail address")
-            return False
-        except smtplib.SMTPException:
-            logging.warning("Unexpected error sending e-mail")
-            return False
+        # try:
+        _server = smtplib.SMTP(cfg['mail_server'],587)
+        _server.ehlo()
+        _server.starttls()
+        _server.ehlo()
+        _server.login(cfg['mail_user'],cfg['mail_pass'])
+        _server.sendmail(cfg['mail_address'], self.sendto, msg.as_string())
+        _server.close()
+        return True
+        # except smtplib.SMTPRecipientsRefused:
+        #     lcd.show("Error in","e-mail address")
+        #     # self.sendtologging.warning()
+        #     return False
+        # except smtplib.SMTPException:
+        #     lcd.show("Unexpected error","sending e-mail")
+        #     return False
 
     def send_message(self, body):
         """ does what it says """
