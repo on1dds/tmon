@@ -54,7 +54,7 @@ hostname        = "tmon"
 mail_address    = "tmon@gmail.com"
 mail_server     = "smtp.gmail.com"
 mail_user       = "tmon@gmail.com"
-mail_pass       = "zbj6e3rZez6bNYvQcFM"
+mail_pass       = "zbj6e3rZez6bNYvQcJM"
 mail_tls	= True
 mail_port	= 587
 

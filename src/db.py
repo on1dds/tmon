@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" tmon - temperature and contact watchdog 
+""" tmon - temperature and contact watchdog
     database access
 """
 import datetime
@@ -23,11 +23,11 @@ class NewLog:
         # create database object
         try:
             self.db = MySQLdb.connect(db_server, db_user, db_pass)
-            self.cursor = self.db.cursor() 
+            self.cursor = self.db.cursor()
         except MySQLdb.Warning as e:
             lcd.show("DB open warning", "OK")
         except MySQLdb.Error as e:
-            lcd.show("DB open failed:", "TMON Stopped")              
+            lcd.show("DB open failed:", "TMON Stopped")
             sys.exit(1)
 
         # create database
@@ -37,7 +37,7 @@ class NewLog:
         except MySQLdb.Warning as e:
             lcd.show("DB create warn", "OK")
         except MySQLdb.Error as e:
-            lcd.show("DB create fault:", "Failed")  
+            lcd.show("DB create fault:", "Failed")
             self.db.rollback()
             self.db.close()
             sys.exit(1)
@@ -45,20 +45,20 @@ class NewLog:
         # create log table
         try:
             self.cursor.execute((
-                "CREATE TABLE IF NOT EXISTS log(" 
+                "CREATE TABLE IF NOT EXISTS log("
                 "id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,"
                 "timestamp DATETIME,"
                 "type CHAR(1),"
                 "sensor VARCHAR(20),"
                 "value DECIMAL(4,1)"
-                ") "))        
+                ") "))
         except MySQLdb.Warning as e:
-            lcd.show("DB create table", "OK")              
+            lcd.show("DB create table", "OK")
         except MySQLdb.Error as e:
             lcd.show("DB new table", "Failed: Stopped")
             self.db.rollback()
             self.db.close()
-            sys.exit(1)       
+            sys.exit(1)
 
     def close(self):
         """ close database """
@@ -85,52 +85,33 @@ class NewLog:
         cursor.execute(query)
         self.db.commit()
 
-    def contacts(self, sensor, now):
+    def write_contact(self, contact, now):
         """ log contact status changes to database """
-        _s = sensor
-        if ((_s.lasttime + UNSAVED_MAX) < now) or \
-            (_s.value != _s.lastvalue):
-            if _s.lastvalue != -100:
-                self.write(_s.type, \
-                    config_getname(_s.address), \
-                    _s.lastvalue)
-            _val = _s.value
-            self.write(_s.type, config_getname(_s.address), _val)
-            _s.lastvalue = _val
-            _s.lasttime = now
+        if ((contact.lasttime + UNSAVED_MAX) < now) or \
+            (contact.value != contact.lastvalue):
+            if contact.lastvalue:
+                self.write('C', contact.name, contact.lastvalue)
+            _val = contact.value
+            self.write('C', contact.name, _val)
+            contact.lastvalue = _val
+            contact.lasttime = now
 
 
-    def temp_changes(self, sensor, now):
+    def write_temperature(self, sensor, now):
         """ write temperature changes to database """
         _s = sensor
         # save all temperatures at least once every UNSAVED_MAX seconds
         if (_s.lasttime + UNSAVED_MAX) < now:
-            self.write(_s.type, config_getname(_s.address), _s.value)
+            self.write(_s.type, _s.name, _s.value)
             _s.lastvalue = _s.value
             _s.lasttime = now
-            
+
         # handle system thermometer
-        elif _s.address == 'system':
-            if abs(_s.lastvalue - _s.value) > .3:
-                self.write(_s.type, config_getname(_s.address), _s.value)
-                _s.lastvalue = _s.value
-                _s.lasttime = now
-                
-        # handle w1 thermometers
-        elif ((abs(_s.lastvalue - _s.value) > .9) and
-                (round(_s.lastvalue, 1) != round(_s.value, 1))):
-            if (abs(_s.lastvalue - _s.value) > .52) and \
-                    (now - _s.lasttime > 60 * 5):
-                self.write(_s.type, \
-                    config_getname(_s.address), \
-                    _s.lastvalue)
-            self.write(_s.type, \
-                config_getname(_s.address), \
-                _s.value)
+        if abs(_s.lastvalue - _s.value) > _s.resolution:
+            self.write('T', _s.name, _s.value)
             _s.lastvalue = _s.value
             _s.lasttime = now
 
-        
 
-        
-        
+
+

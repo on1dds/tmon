@@ -61,12 +61,6 @@ LCD_LINE = (0x80, 0xC0, 0x90, 0xD0)
 E_PULSE = 0.0005
 E_DELAY = 0.0005
 
-# Usage
-#
-# lcd_string("Rasbperry Pi",1)
-# lcd_string("16x2 LCD Test",2)
-
-
 def init():
     """ setup GPIO """
     # GPIO.setmode(GPIO.BCM)       # Use BCM GPIO numbers
@@ -136,7 +130,8 @@ def writeline(message, line):
     cmd(LCD_LINE[line - 1])
     for i in range(LCD_WIDTH):
         char(ord(message[i]))
-        
+
 def show(line1, line2):
+    """ Print 2 lines on the display """
     writeline(line1, 1)
     writeline(line2, 2)

@@ -2,8 +2,9 @@
 #
 # tmon tools
 #
-""" tmon constants """
-
+""" tmon - temperature and contact watchdog
+module for setting global variables and functions
+"""
 DELAY_CLEARLOG = 60 * 60 * 1
 DELAY_BLINK = 1
 # DELAY_SYSTEMP = 5
@@ -42,32 +43,45 @@ def terminate(msg):
     logging.warning(msg)
     sys.exit()
 
-def config_getsensor(_name_):
+def get_sensor_config(_name_):
     """ get sensor from configuration """
-    _s = [_s for _s in filter(lambda _s: 'address' in _s and _s['address'] == _name_, cfg['sensors'])]
+    _s = [_s for _s in cfg['sensors'] \
+        if 'address' in _s and _s['address'] == _name_]
     if len(_s) == 1:
         return _s[0]
-    _s = [_s for _s in filter(lambda _s: 'name' in _s and _s['name'] == _name_, cfg['sensors'])]
+    _s = [_s for _s in cfg['sensors'] if 'name' in _s and _s['name'] == _name_]
     if len(_s) == 1:
         return _s[0]
     return False
-    
+
 def config_getdisabled():
     """ get disabled sensors from configuration """
-    return [s['address'] for s in cfg['sensors'] if 'disable' in s and s['disable'] == True]
-    
-    
+    return [s['address'] \
+        for s in cfg['sensors'] \
+            if 'disable' in s and s['disable'] == True]
+
+def config_sensor_get(_name_, _attrib):
+    """ get attribute variable from sensor in config """
+    _s = get_sensor_config(_name_)
+    if _attrib in _s:
+        return _s[_attrib]
+    return False
+
+
 def config_getname(_address_):
     """ get name (alias) for sensor address """
-    _s = [s['name'] for s in cfg['sensors'] if 'name' in s and 'address' in s and s['address'] == _address_]
+    _s = [s['name'] \
+        for s in cfg['sensors'] \
+            if 'name' in s and 'address' in s and s['address'] == _address_]
     if len(_s) == 1:
         return _s[0]
     return _address_
-    
+
 def config_getaddress(_name_):
     """ get sensor address from name """
-    _s = [s['address'] for s in cfg['sensors'] if 'name' in s and 'address' in s and s['name'] == _name_]
+    _s = [s['address'] \
+        for s in cfg['sensors'] \
+            if 'name' in s and 'address' in s and s['name'] == _name_]
     if len(_s) == 1:
         return _s[0]
     return _name_
-    
