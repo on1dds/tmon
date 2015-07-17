@@ -85,7 +85,8 @@ def show_status():
 
 def mysql_is_running():
     """ check if mysql is running """
-    tmp = os.popen("mysqladmin -u " + cfg['db_user'] + " -p" + cfg['db_pass'] + " ping").read()
+    db_cfg = cfg['db']
+    tmp = os.popen("mysqladmin -u " + db_cfg['user'] + " -p" + db_cfg['pass'] + " ping").read()
     return tmp == "mysqld is alive\n"
 
 def gpio_init():
@@ -132,6 +133,14 @@ while GPIO.input(BTN_INFO):
     pass
 
 # wait for mysql server when run on boot
+db_cfg = False
+if 'db' in cfg:
+    db_cfg = cfg['db']
+    if not all(x in ['server','name','user','pass','expire'] for x in db_cfg):
+       terminate("database configuration incomplete")
+else:
+    terminate("database not configured")
+
 _count = 0
 while not mysql_is_running():
     _count = _count+1
@@ -140,9 +149,10 @@ while not mysql_is_running():
     if _count > 10:
         lcd.writeline("err: No DB", 2)
         terminate("No mysql running")
-
+    
+        
 # open/create database for logging
-log = db.NewLog(cfg['db_server'], cfg['db_user'], cfg['db_pass'])
+log = db.NewLog(db_cfg['server'], db_cfg['name'], db_cfg['user'], db_cfg['pass'], db_cfg['expire'])
 
 # initialize event intervals
 now = time.time()
@@ -159,7 +169,7 @@ while True:
     # cleanup database
     if now > timer_clearlog:
         timer_clearlog = time.time() + DELAY_CLEARLOG
-        log.clean(cfg['db_expire'])
+        log.clean()
 
     # log contact sensor changes
     if now == now:

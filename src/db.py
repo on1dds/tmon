@@ -6,7 +6,7 @@ import datetime
 import MySQLdb
 import lcd
 import sys
-from globals import *
+from globals import UNSAVED_MAX
 
 # disable warnings from MySQLdb to console
 from warnings import filterwarnings
@@ -15,10 +15,11 @@ filterwarnings('ignore', category = MySQLdb.Warning)
 class NewLog:
     """ TMon Log SQL Connector"""
 
-    def __init__(self, db_server, db_user, db_pass):
+    def __init__(self, db_server, db_name, db_user, db_pass, db_expire):
         self.cursor = None
         self.db = None
         self.cursor = None
+        self.expire = int(db_expire)
 
         # create database object
         try:
@@ -76,11 +77,10 @@ class NewLog:
         cursor.execute(query)
         self.db.commit()
 
-    def clean(self, period):
+    def clean(self):
         """ clean up old logs """
-        period = str(period)
         query = "DELETE FROM log WHERE timestamp < (NOW() - INTERVAL " + \
-            period + " day)"
+            str(self.expire) + " day)"
         cursor = self.db.cursor()
         cursor.execute(query)
         self.db.commit()

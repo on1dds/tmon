@@ -105,10 +105,13 @@ class Thermometer(Sensor):
 
     def run(self):
         while True:
-            # sys.stdout.write("T")
-            self.value = self.read()
-            super(Thermometer, self).handle_alerts()
-            time.sleep(self.interval)
+            if not self.disabled:
+                # sys.stdout.write("T")
+                self.value = self.read()
+                super(Thermometer, self).handle_alerts()
+                time.sleep(self.interval)
+            else:
+                time.sleep(100000)
 
     def read(self):
         """ read attached or on-board thermometer """
