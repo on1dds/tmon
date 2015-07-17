@@ -104,6 +104,11 @@ def gpio_init():
 # *****************************************************
 
 # initialize
+
+# init GPIO for thermometers
+os.system('modprobe w1-gpio')
+os.system('modprobe w1-therm')
+
 gpio_init()
 lcd.init()
 lcd.show("tmon " + __version__, "initializing ...")
@@ -145,6 +150,7 @@ timer_thermpoll = now
 timer_clearlog = now
 timer_blink = now
 timer_lcd = now
+timer_tick = now
 timer_errdisp = 0
 
 while True:
@@ -152,7 +158,7 @@ while True:
 
     # cleanup database
     if now > timer_clearlog:
-        timer_clearlog = now + DELAY_CLEARLOG
+        timer_clearlog = time.time() + DELAY_CLEARLOG
         log.clean(cfg['db_expire'])
 
     # log contact sensor changes
@@ -162,19 +168,29 @@ while True:
 
     # log thermometer changes
     if now > timer_thermpoll:
-        timer_thermpoll = now + DELAY_THERMPOLL
+        timer_thermpoll = time.time() + DELAY_THERMPOLL
         for _s in sensors.getlist('Thermometer'):
             log.write_temperature(_s, now)
 
     # heartbeat led
     if now > timer_blink:
-        timer_blink = now + DELAY_BLINK
+        timer_blink = time.time() + DELAY_BLINK
         okled = not okled
         GPIO.output(LED_OK, okled)
 
+    if now > timer_tick:
+        timer_tick = time.time() + 5
+        # sys.stdout.write('.')
+        # sys.stdout.flush()
+        for s in sensors.list_:
+            print s
+        print
+        
     # show status error messages
     show_status()
     GPIO.output(LED_ERROR, len(get_errorlist())>0)
+
+    
 
 log.close()
 GPIO.output(LED_OK, False)

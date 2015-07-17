@@ -67,6 +67,9 @@ def config_sensor_get(_name_, _attrib):
         return _s[_attrib]
     return False
 
+def cfg_get_list_by_attrib(_attrib):
+    """ get list of all sensors containing the given attribute """
+    _sensor = [_s for _s in cfg['sensors'] if _attrib in _s]
 
 def config_getname(_address_):
     """ get name (alias) for sensor address """
