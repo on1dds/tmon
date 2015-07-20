@@ -6,6 +6,8 @@ import time
 import RPi.GPIO as GPIO
 import collections
 import os
+import signal
+import threading
 
 # import local modules
 import db
@@ -14,6 +16,9 @@ import lcd
 from globals import *
 
 __version__ = "0.1"
+
+cfg = {}
+execfile("/etc/tmon/tmonconf.py", cfg)
 
 lcd_message = collections.namedtuple('lcd_message','name msg')
 
@@ -39,7 +44,8 @@ def get_errorlist():
     errorlist = []
     for _sensor in sensors.list_:
         for _alert in _sensor.alerts:
-            _msg = lcd_message(name= _alert.sensor.name, msg= _alert.msg_trigger)
+            _msg = lcd_message(name= _alert.sensor.name, \
+                msg= _alert.msg_trigger)
             if _alert.triggered:
                 errorlist.append(_msg)
     return errorlist
@@ -85,8 +91,10 @@ def show_status():
 
 def mysql_is_running():
     """ check if mysql is running """
-    db_cfg = cfg['db']
-    tmp = os.popen("mysqladmin -u " + db_cfg['user'] + " -p" + db_cfg['pass'] + " ping").read()
+    _db_cfg = cfg['db']
+    tmp = os.popen("mysqladmin -u " + _db_cfg['user'] + \
+        " -p" + _db_cfg['pass'] + \
+        " ping").read()
     return tmp == "mysqld is alive\n"
 
 def gpio_init():
@@ -99,7 +107,22 @@ def gpio_init():
     GPIO.output(LED_ERROR, True)
     GPIO.setup(BTN_INFO, GPIO.IN, pull_up_down=GPIO.PUD_DOWN) # init info button
 
+def signal_handler(sig, frame):
+    """ cleanup on exit """
+    print('You pressed Ctrl+C!')
+    if log:
+        log.close()
+    sensors.Sensor.exitapp = True
+    print "awaiting threads to stop"
+    while threading.active_count() > 1:
+        time.sleep(0.1)
+    GPIO.output(LED_OK, False)
+    GPIO.output(LED_ERROR, False)
+    lcd.show("", "")
+    GPIO.cleanup()
 
+    sys.exit(0)
+    
 # *****************************************************
 #  main
 # *****************************************************
@@ -109,6 +132,8 @@ def gpio_init():
 # init GPIO for thermometers
 os.system('modprobe w1-gpio')
 os.system('modprobe w1-therm')
+
+signal.signal(signal.SIGINT, signal_handler)
 
 gpio_init()
 lcd.init()
@@ -132,15 +157,18 @@ lcd.writeline(getipaddress(), 2)
 while GPIO.input(BTN_INFO):
     pass
 
-# wait for mysql server when run on boot
+# check database configuration
 db_cfg = False
 if 'db' in cfg:
     db_cfg = cfg['db']
-    if not all(x in ['server','name','user','pass','expire'] for x in db_cfg):
-       terminate("database configuration incomplete")
+    if not all(x in ['server', 'name', 'user', 'pass', 'expire'] \
+        for x in db_cfg):
+        terminate("database configuration incomplete")
 else:
     terminate("database not configured")
 
+# wait for mysql server when run on boot  
+# and terminate if not detected after 10 seconds  
 _count = 0
 while not mysql_is_running():
     _count = _count+1
@@ -149,10 +177,10 @@ while not mysql_is_running():
     if _count > 10:
         lcd.writeline("err: No DB", 2)
         terminate("No mysql running")
-    
-        
+
 # open/create database for logging
-log = db.NewLog(db_cfg['server'], db_cfg['name'], db_cfg['user'], db_cfg['pass'], db_cfg['expire'])
+log = db.NewLog(db_cfg['server'], db_cfg['name'], \
+    db_cfg['user'], db_cfg['pass'], db_cfg['expire'])
 
 # initialize event intervals
 now = time.time()
@@ -161,6 +189,7 @@ timer_clearlog = now
 timer_blink = now
 timer_lcd = now
 timer_tick = now
+timer_print = now
 timer_errdisp = 0
 
 while True:
@@ -187,25 +216,24 @@ while True:
         timer_blink = time.time() + DELAY_BLINK
         okled = not okled
         GPIO.output(LED_OK, okled)
-
-    if now > timer_tick:
-        timer_tick = time.time() + 5
-        # sys.stdout.write('.')
-        # sys.stdout.flush()
-        for s in sensors.list_:
-            print s
-        print
+        
+    # if now > timer_tick:
+    #    timer_tick = time.time() + .2
+    #    sys.stdout.write('.')
+    #    sys.stdout.flush()
+        
+    # if now > timer_print:
+    #    timer_print = time.time() + 5
+    #    sys.stdout.write('.')
+    #    sys.stdout.flush()
+    #    print
+    #    for s in sensors.list_:
+    #        print s
         
     # show status error messages
     show_status()
     GPIO.output(LED_ERROR, len(get_errorlist())>0)
 
     
+#
 
-log.close()
-GPIO.output(LED_OK, False)
-GPIO.output(LED_ERROR, False)
-lcd.show("", "")
-GPIO.cleanup()
-
-sys.exit(0)

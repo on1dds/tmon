@@ -34,7 +34,7 @@ class NewLog:
         # create database
         try:
             self.cursor.execute("CREATE DATABASE IF NOT EXISTS tmon")
-            self.cursor.execute("USE tmon")
+            self.cursor.execute("USE " + db_name)
         except MySQLdb.Warning as e:
             lcd.show("DB create warn", "OK")
         except MySQLdb.Error as e:

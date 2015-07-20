@@ -16,17 +16,17 @@ from email.mime.text import MIMEText
 import email.utils
 
 
-def send_sms(sensor, body):
+def send_sms(sensor, body, hostname, cfg):
     """ does what it says """
 
     try:
         client = TwilioRestClient(
-            account= cfg['twilio_account_sid'],
-            token= cfg['twilio_auth_token'])
+            account= cfg['account_sid'],
+            token= cfg['auth_token'])
         client.messages.create(
             to= sensor.sendto,
-            from_= cfg['twilio_number'],
-            body= cfg['hostname'] + " " + sensor.sensor_name + " " + body,
+            from_= cfg['number'],
+            body= hostname + " " + sensor.sensor_name + " " + body,
         )
     except twilio.rest.exceptions.TwilioRestException:
         lcd.show(sensor.sendto, "not SMS capable")

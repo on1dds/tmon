@@ -2,7 +2,6 @@
 
 find, inventorize, read and update sensors by type
 """
-import os
 import sys
 import glob
 from globals import *
@@ -19,11 +18,10 @@ list_ = []
 
 class Sensor(threading.Thread):
     """ define sensor base class """
+    exitapp = False
 
     def __init__(self, address):
-        # run the parent thread init
-        super(Sensor,self).__init__()
-
+        super(Sensor, self).__init__()
         # set default configuration
         self.address = address
         self.name = address
@@ -37,7 +35,8 @@ class Sensor(threading.Thread):
         self.lastvalue = False
         self.alerts = []
         self.error = False
-        
+        # run the parent thread init
+
     def run(self):
         """ update sensor values and trigger alerts """
         if not self.disabled:
@@ -62,30 +61,35 @@ class Contact(Sensor):
     STATUS_FAULT = 2
     STATUS = ("OPEN", "CLOSED", "FAULT")
 
-    def __init__(self, address, gpiopin):
+    def __init__(self, address, gpiopin, c_cfg):
         super(Contact, self).__init__(address)
-
         # set hardware
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(gpiopin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-
         self.attach = None
         self.gpiopin = gpiopin
         self.interval = 0.5
         self.value = self.read()
         self.lastvalue = self.value
+        cfg_to_contact(self, c_cfg)
+        list_.append(self)
+        self.start()
 
     def run(self):
         while True:
-            if not self.disabled:
-                # sys.stdout.write("S")
+            if self.exitapp:
+                break
+            if not self.disabled and \
+                time.time() > self.lasttime + self.interval:
+                self.lasttime = time.time()
+                # sys.stdout.write("C")
                 self.value = self.read()
                 super(Contact, self).handle_alerts()
-                time.sleep(self.interval)
             else:
-                time.sleep(100000)
+                time.sleep(.1)
 
     def read(self):
+        """ get current value from hardware """
         return GPIO.input(self.gpiopin)
 
     def __str__(self):
@@ -95,23 +99,31 @@ class Thermometer(Sensor):
     """ sensor for measuring temperature """
     SYSTEM_SENSOR = 'system'
 
-    def __init__(self, address):
+    def __init__(self, address, t_cfg):
         super(Thermometer, self).__init__(address)
         self.interval = 5
         self.buffer = []
         self.buffersize =  1
         self.resolution = 0.5
         self.errorcount = 0
+        self.value = self.read()
+        self.lastvalue = self.value
+        cfg_to_thermometer(self, t_cfg)
+        list_.append(self)
+        self.start()
 
     def run(self):
         while True:
-            if not self.disabled:
+            if self.exitapp:
+                break
+            if not self.disabled and \
+                time.time() > self.lasttime + self.interval:
+                self.lasttime = time.time()
                 # sys.stdout.write("T")
                 self.value = self.read()
                 super(Thermometer, self).handle_alerts()
-                time.sleep(self.interval)
             else:
-                time.sleep(100000)
+                time.sleep(1)
 
     def read(self):
         """ read attached or on-board thermometer """
@@ -125,7 +137,8 @@ class Thermometer(Sensor):
         else:
             # read w1 temperature from system
             _temperature = False
-            _tfile = glob.glob('/sys/bus/w1/devices/' + self.address + '/w1_slave' )
+            _tfile = glob.glob('/sys/bus/w1/devices/' + \
+                self.address + '/w1_slave' )
             if len(_tfile) == 1:
                 _f = open(_tfile[0], 'r')
                 _lines = _f.readlines()
@@ -153,7 +166,7 @@ class Thermometer(Sensor):
 
     def __str__(self):
         return "%s: %0.2f" % (self.name, self.value)
-        
+
 class Alert(object):
     """ send a message whenever a predefined condition is met/restored """
 
@@ -196,18 +209,18 @@ class Alert(object):
 
 def cfg_to_sensor(sensor, conf):
     """ read given sensor configuration into sensor """
-    if 'name' in conf: 
-        sensor.name = conf['name'] 
-    if 'disable' in conf: 
-        sensor.disabled = conf['disable'] 
-    if 'interval' in conf: 
-        sensor.interval = conf['interval'] 
+    if 'name' in conf:
+        sensor.name = conf['name']
+    if 'disable' in conf:
+        sensor.disabled = conf['disable']
+    if 'interval' in conf:
+        sensor.interval = conf['interval']
 
 def cfg_to_contact(contact, conf):
     """ read given contact configuration into contact """
     cfg_to_sensor(contact, conf)
     if 'attach' in conf:
-        contact.attach = conf['attach'] 
+        contact.attach = conf['attach']
     if 'alerts' in conf:
         contact.alerts = []
         for _cfg in conf['alerts']:
@@ -225,13 +238,13 @@ def cfg_to_thermometer(thermometer, conf):
     cfg_to_sensor(thermometer, conf)
 
     if 'buffer' in conf:
-        thermometer.buffersize = conf['buffer'] 
+        thermometer.buffersize = conf['buffer']
     if 'precision' in conf:
-        thermometer.precision = conf['precision'] 
+        thermometer.precision = conf['precision']
     if 'buffer' in conf:
-        thermometer.buffersize = conf['buffer'] 
+        thermometer.buffersize = conf['buffer']
     if 'resolution' in conf:
-        thermometer.resolution = conf['resolution'] 
+        thermometer.resolution = conf['resolution']
     if 'alerts' in conf:
         thermometer.alerts = []
         for _cfg in conf['alerts']:
@@ -251,20 +264,15 @@ def create():
     thermometers_config = [_s for _s in cfg['sensors']
         if 'thermometer' in _s]
     for t_cfg in thermometers_config:
-        t = Thermometer(t_cfg['thermometer'])
-        cfg_to_thermometer(t, t_cfg)
-        t.start()
-        list_.append(t)
+        Thermometer(t_cfg['thermometer'], t_cfg)
 
     # get list of configured contacts
     contacts_config = [_s for _s in cfg['sensors'] if 'contact' in _s]
     for c_cfg in contacts_config:
         pin = int(c_cfg['contact'])
         if 0 <= pin < 3:
-            c = Contact(c_cfg['contact'], Contact.GPIO[pin])
-            cfg_to_contact(c, c_cfg)
-            c.start()
-            list_.append(c)
+            Contact(c_cfg['contact'], Contact.GPIO[pin], c_cfg)
+
 
     # get list of detected w1 thermometers
     t_list = glob.glob('/sys/bus/w1/devices/' + '10*')
@@ -274,7 +282,7 @@ def create():
     # start unconfigured w1 thermometers
     for t_id in t_list:
         if not get(t_id):
-            t = Thermometer(t_id)
+            t = Thermometer(t_id, [])
             t.start()
             list_.append(t)
 
