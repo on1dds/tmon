@@ -18,7 +18,6 @@
 # http://www.raspberrypi-spy.co.uk/
 #
 # --------------------------------------
-
 # The wiring for the LCD is as follows:
 # 1 : GND
 # 2 : 5V

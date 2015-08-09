@@ -44,27 +44,31 @@ sensors = (
     },       
 )
 
-
 # database configuration
-#
-db_server       = "localhost"
-db_name         = "tmon"
-db_user         = "root"
-db_pass         = "pi"
-db_expire       = 24           # hours to keep log in database
+db = ({
+        'server': "localhost",
+        'name': "tmon",
+        'user': "root",
+        'pass': "pi",
+        'expire': 24                # hours to keep log in database
+    })
 
 # mail setup
-hostname        = "tmon"
-mail_address    = "tmon@gmail.com"
-mail_server     = "smtp.gmail.com"
-mail_user       = "tmon@gmail.com"
-mail_pass       = "zbj6e3rZez6bNYvQcJM"
-mail_tls	= True
-mail_port	= 587
+mail = ({
+    'address' : "tmon@gmail.com",
+    'server' : "smtp.gmail.com",
+    'user' : "tmon@gmail.com",
+    'pass' : "zbj6e3rjJz6bNYvQcJM",
+    'tls' : True,
+    'port' : 587
+})
 
-# SMS setup    
-twilio_account_sid  = "AC********************************"
-twilio_auth_token   = "05******************************"
-twilio_number       = "+5553809123"
+# SMS setup
+twilio = ({
+    'account_sid' : "AC********************************",
+    'auth_token': "05******************************",
+    'number': "+5553809123"
+})
+    
 
 

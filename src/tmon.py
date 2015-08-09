@@ -4,10 +4,11 @@
 import sys
 import time
 import RPi.GPIO as GPIO
-import collections
+from collections import namedtuple
 import os
 import signal
 import threading
+import pickle
 
 # import local modules
 import db
@@ -20,7 +21,7 @@ __version__ = "0.1"
 cfg = {}
 execfile("/etc/tmon/tmonconf.py", cfg)
 
-lcd_message = collections.namedtuple('lcd_message','name msg')
+lcd_message = namedtuple('lcd_message', ['name', 'msg'])
 
 # pointer in display message queue
 error_index = 0         # current message in error queue
@@ -42,12 +43,10 @@ timer_errdisp = 0       # delay for errors on display after push button
 def get_errorlist():
     """ return list of all triggered notifications """
     errorlist = []
-    for _sensor in sensors.list_:
-        for _alert in _sensor.alerts:
-            _msg = lcd_message(name= _alert.sensor.name, \
-                msg= _alert.msg_trigger)
-            if _alert.triggered:
-                errorlist.append(_msg)
+    for sensor in sensors.list_:
+        for alert in sensor.alerts:
+            if alert.triggered:
+                errorlist.append(lcd_message(alert.sensor.name, alert.msg_trigger))
     return errorlist
 
 def show_status():
@@ -122,12 +121,39 @@ def signal_handler(sig, frame):
     GPIO.cleanup()
 
     sys.exit(0)
+
+def check_cfg():
+    a = check_config(('db', ['server','name','user','pass','expire']))
+    if a:
+        terminate("error in", a)
+
+    a = check_config(('twilio', ['account_sid','auth_token','number']))
+    if a:
+        terminate("error in", a)
+
+    a = check_config(('mail', ['address','server','user','pass','tls','port']))
+    if a:
+        terminate("error in", a)
+        
+    return True
+
+def check_config(check):  
+    if check[0] in cfg:
+        for cmd in check[1]:
+            if not cmd in cfg[check[0]]:
+                return check[0] + ":" + cmd
+        else:
+            return False
+    else:
+        return check[0]
     
+            
 # *****************************************************
 #  main
 # *****************************************************
 
 # initialize
+check_cfg()
 
 # init GPIO for thermometers
 os.system('modprobe w1-gpio')
@@ -156,16 +182,7 @@ lcd.writeline(getipaddress(), 2)
 # to enable reading the IP address
 while GPIO.input(BTN_INFO):
     pass
-
-# check database configuration
-db_cfg = False
-if 'db' in cfg:
-    db_cfg = cfg['db']
-    if not all(x in ['server', 'name', 'user', 'pass', 'expire'] \
-        for x in db_cfg):
-        terminate("database configuration incomplete")
-else:
-    terminate("database not configured")
+# check configuration file
 
 # wait for mysql server when run on boot  
 # and terminate if not detected after 10 seconds  
@@ -178,7 +195,9 @@ while not mysql_is_running():
         lcd.writeline("err: No DB", 2)
         terminate("No mysql running")
 
+        
 # open/create database for logging
+db_cfg = cfg['db']
 log = db.NewLog(db_cfg['server'], db_cfg['name'], \
     db_cfg['user'], db_cfg['pass'], db_cfg['expire'])
 
@@ -190,6 +209,7 @@ timer_blink = now
 timer_lcd = now
 timer_tick = now
 timer_print = now
+timer_checknew = now
 timer_errdisp = 0
 
 while True:
@@ -200,6 +220,11 @@ while True:
         timer_clearlog = time.time() + DELAY_CLEARLOG
         log.clean()
 
+    # read 
+    if now > timer_checknew:
+        timer_checknew = time.time() + DELAY_CHECKNEW
+        sensors.create()
+        
     # log contact sensor changes
     if now == now:
         for _s in sensors.getlist('Contact'):
@@ -217,23 +242,29 @@ while True:
         okled = not okled
         GPIO.output(LED_OK, okled)
         
-    # if now > timer_tick:
-    #    timer_tick = time.time() + .2
-    #    sys.stdout.write('.')
-    #    sys.stdout.flush()
+    if now > timer_tick:
+       timer_tick = time.time() + .2
         
-    # if now > timer_print:
-    #    timer_print = time.time() + 5
-    #    sys.stdout.write('.')
-    #    sys.stdout.flush()
-    #    print
-    #    for s in sensors.list_:
-    #        print s
-        
-    # show status error messages
-    show_status()
-    GPIO.output(LED_ERROR, len(get_errorlist())>0)
+    if now > timer_print:
+        timer_print = time.time() + 5
+        lcd.show("tmon " + __version__, "Alerts: " + str(len(get_errorlist())))
+        f = open('/tmp/tmon.log','w')
+        for sensor in sensors.list_:
+            s = sensors.Sensor_data()
+            s.address = sensor.address
+            s.type = sensor.__class__.__name__
+            s.name = sensor.name
+            s.disabled = sensor.disabled
+            s.value = sensor.value
+            s.lasttime = sensor.lasttime
+            s.interval = sensor.interval
+            s.error = sensor.error
+            print (pickle.dumps(s))
+            print "-----------"
+        f.close()
 
-    
-#
+
+    # show status error messages
+    #show_status()
+    GPIO.output(LED_ERROR, len(get_errorlist())>0)
 

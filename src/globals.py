@@ -5,6 +5,9 @@
 """ tmon - temperature and contact watchdog
 module for setting global variables and functions
 """
+DEBUG = False
+
+
 DELAY_CLEARLOG = 60 * 60 * 1
 DELAY_BLINK = 1
 # DELAY_SYSTEMP = 5
@@ -12,6 +15,7 @@ UNSAVED_MAX = 60 * 60 * 1
 DELAY_THERMPOLL = 5
 DELAY_DISPLAY = 3
 DELAY_ERRDISP = 5
+DELAY_CHECKNEW = 12
 
 
 LED_OK = 25

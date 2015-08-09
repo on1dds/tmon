@@ -5,10 +5,22 @@ find, inventorize, read and update sensors by type
 import sys
 import glob
 from globals import *
-import messaging
 import time
 import threading
 import RPi.GPIO as GPIO
+
+from twilio.rest import TwilioRestClient
+import twilio
+import smtplib
+import lcd
+import re as regex
+import urllib2
+from time import strftime
+
+from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
+from email.mime.text import MIMEText
+import email.utils
 
 list_ = []
 
@@ -16,8 +28,20 @@ list_ = []
 #  classes
 # *****************************************************
 
+class Sensor_data():
+    # set default configuration.address = address
+    address = ""
+    type = ""
+    name = address
+    disabled = False
+    value = False
+    lasttime = time.time()
+    interval = 5
+    error = False
+
 class Sensor(threading.Thread):
     """ define sensor base class """
+    hostname = 'tmon'
     exitapp = False
 
     def __init__(self, address):
@@ -41,7 +65,7 @@ class Sensor(threading.Thread):
         """ update sensor values and trigger alerts """
         if not self.disabled:
             self.lasttime = time.time()
-            print self.name
+            #print self.name
 
     def handle_alerts(self):
         """ run through and trigger all alerts """
@@ -58,10 +82,10 @@ class Contact(Sensor):
     GPIO = (22, 27, 17)
     STATUS_OPEN = 0
     STATUS_CLOSED = 1
-    STATUS_FAULT = 2
+
     STATUS = ("OPEN", "CLOSED", "FAULT")
 
-    def __init__(self, address, gpiopin, c_cfg):
+    def __init__(self, address, gpiopin, config= None):
         super(Contact, self).__init__(address)
         # set hardware
         GPIO.setmode(GPIO.BCM)
@@ -71,7 +95,7 @@ class Contact(Sensor):
         self.interval = 0.5
         self.value = self.read()
         self.lastvalue = self.value
-        cfg_to_contact(self, c_cfg)
+        cfg_to_contact(self, config)
         list_.append(self)
         self.start()
 
@@ -98,8 +122,9 @@ class Contact(Sensor):
 class Thermometer(Sensor):
     """ sensor for measuring temperature """
     SYSTEM_SENSOR = 'system'
+    STATUS_FAULT = -100
 
-    def __init__(self, address, t_cfg):
+    def __init__(self, address, config= None):
         super(Thermometer, self).__init__(address)
         self.interval = 5
         self.buffer = []
@@ -108,7 +133,7 @@ class Thermometer(Sensor):
         self.errorcount = 0
         self.value = self.read()
         self.lastvalue = self.value
-        cfg_to_thermometer(self, t_cfg)
+        cfg_to_thermometer(self, config)
         list_.append(self)
         self.start()
 
@@ -150,22 +175,29 @@ class Thermometer(Sensor):
                     temp_pos = _lines[1].find('t=')
                     if temp_pos != -1:
                         _value = float(_lines[1][temp_pos + 2:]) / 1000.0
-                        if _value < 80:
+                        if _value < 85:
                             _temperature = _value
+                        else:
+                            _temperature = False
 
         # set error when no temperature value
-        self.error = _temperature == 0
+        self.error = _temperature == False
         if self.error:
+            self.value = False
             return False
 
         # calculate average temperature from buffer
+
         self.buffer.append(_temperature)
         if len(self.buffer) > self.buffersize:
             self.buffer.pop(0)
         return sum(self.buffer) / len(self.buffer)
 
     def __str__(self):
-        return "%s: %0.2f" % (self.name, self.value)
+        if self.value:
+            return "%s: %0.2f" % (self.name, self.value)
+        else:
+            return "%s: Error" % (self.name)
 
 class Alert(object):
     """ send a message whenever a predefined condition is met/restored """
@@ -190,121 +222,225 @@ class Alert(object):
 
     def handle(self):
         """ send message in case something is wrong """
-        value = self.sensor.value
-        if value >= self.triggerpoint:
-            self.triggered = True
-            if not self.notified:
-                # print self.sensor, ":", self.sendto, self.msg_trigger
-                self.notified = True
-        elif self.triggered and value <= (self.triggerpoint - self.hysteresis):
-            if self.notified:
+
+        if self.sensor.__class__.__name__ == 'Contact':
+            value = self.sensor.value
+            if value == self.triggerpoint:
+                self.triggered = True
+                if not self.notified:
+                    send_alert(self, self.msg_trigger)
+                    # print self.sensor, ":", self.sendto, self.msg_trigger
+                    self.notified = True
+            elif self.notified:
+                self.triggered = False
+                send_alert(self, self.msg_restore)
                 # print self.sensor, ":", self.sendto, self.msg_restore
                 self.notified = False
-            if not self.notified:
-                self.triggered = False
+
+        elif self.sensor.__class__.__name__ == 'Thermometer':
+            value = self.sensor.value
+            if value:
+                if value >= self.triggerpoint:
+                    self.triggered = True
+                    if not self.notified:
+                        send_alert(self, self.msg_trigger)
+                        # print self.sensor, ":", self.sendto, self.msg_trigger
+                        self.notified = True
+                elif self.notified and value <= (self.triggerpoint - .5):
+                    self.triggered = False
+                    send_alert(self, self.msg_restore)
+                    # print self.sensor, ":", self.sendto, self.msg_restore
+                    self.notified = False
+            else:
+                pass
 
 # *****************************************************
-#  functions
+#  functions to send messages
+# *****************************************************
+def send_sms(to, message):
+    """ does what it says """
+    twilio = cfg['twilio']
+    if DEBUG:
+        print("ERROR: " + to + ":"+message)
+        return True
+        
+    try:
+        account = twilio['account_sid']
+        token= twilio['auth_token']
+        client = TwilioRestClient(account,token)
+        
+        client.messages.create(
+            to= to, 
+            from_= twilio['number'], body= message)
+    except twilio.rest.exceptions.TwilioRestException:
+        lcd.show(to, "not SMS capable")
+        return False
+
+    except twilio.rest.exceptions:
+        lcd.show("Error:","Twilio SMS fault")
+        return False
+
+    return True
+
+def send_email(alert, message):
+    #print("email verzenden")
+    
+    mail = cfg['mail']
+    host_ = cfg['hostname']
+    from_ = mail['address']
+    name_ = alert.sensor.name
+    smtp_ = mail['server']
+    login_ = mail['user']
+    pass_ = mail['pass']
+    port_ = mail['port']
+
+    # attach subject
+    msg = MIMEMultipart()
+    msg['From'] = email.utils.formataddr((name_ + "@" + host_, from_ ))
+    msg['To'] = alert.sendto
+    msg['Subject'] = message
+    # msg.attach(MIMEText(message, 'plain'))
+
+    # attach snapshot
+    if hasattr(alert.sensor,'attach') and alert.sensor.attach:
+    # if alert.sensor.attach:
+        url = alert.sensor.attach
+        filename = strftime("%y%m%d_%H%M%S") + ".jpg"
+        a = MIMEImage(urllib2.urlopen(url).read(),'jpeg')
+        a.add_header('Content-Disposition', 'attachment', filename=filename)
+        msg.attach(a)
+
+    # try:
+    _server = smtplib.SMTP(smtp_, port_)
+    _server.ehlo()
+    _server.starttls()
+    _server.ehlo()
+    _server.login(login_, pass_)
+    _server.sendmail(from_, alert.sendto, msg.as_string())
+    _server.close()
+    return True
+
+def send_alert(alert, message):
+    """ does what it says """
+    to = alert.sendto
+ 
+    # print "I should send a message here,", alert, message
+
+    if regex.match(r"[^@]+@[^@]+\.[^@]+", to):
+        return send_email(alert, message)
+
+    elif to[0] == '+' and to[1:].isalnum():
+        message = alert.sensor.name + ":" + message
+        return send_sms(to, message)
+    return True
+
+
+# *****************************************************
+#  functions to read sensors config
 # *****************************************************
 
 def cfg_to_sensor(sensor, conf):
     """ read given sensor configuration into sensor """
-    if 'name' in conf:
-        sensor.name = conf['name']
-    if 'disable' in conf:
-        sensor.disabled = conf['disable']
-    if 'interval' in conf:
-        sensor.interval = conf['interval']
+    if conf:
+        if 'name' in conf:
+            sensor.name = conf['name']
+        if 'disable' in conf:
+            sensor.disabled = conf['disable']
+        if 'interval' in conf:
+            sensor.interval = conf['interval']
 
 def cfg_to_contact(contact, conf):
     """ read given contact configuration into contact """
-    cfg_to_sensor(contact, conf)
-    if 'attach' in conf:
-        contact.attach = conf['attach']
-    if 'alerts' in conf:
-        contact.alerts = []
-        for _cfg in conf['alerts']:
-            if len(_cfg) == 4:
-                _alert = Alert(contact, _cfg[1], _cfg[2], _cfg[3])
-                if _cfg[0] == 'closed':
-                    _alert.triggerpoint = Contact.STATUS_CLOSED
-                    contact.alerts.append(_alert)
-                elif _cfg[0] == 'open':
-                    _alert.triggerpoint = Contact.STATUS_OPEN
-                    contact.alerts.append(_alert)
+    if conf:
+        cfg_to_sensor(contact, conf)
+        if 'attach' in conf:
+            contact.attach = conf['attach']
+        if 'alerts' in conf:
+            contact.alerts = []
+            for _cfg in conf['alerts']:
+                if len(_cfg) == 4:
+                    _alert = Alert(contact, _cfg[1], _cfg[2], _cfg[3])
+                    if _cfg[0] == 'closed':
+                        _alert.triggerpoint = Contact.STATUS_CLOSED
+                        contact.alerts.append(_alert)
+                    elif _cfg[0] == 'open':
+                        _alert.triggerpoint = Contact.STATUS_OPEN
+                        contact.alerts.append(_alert)
 
 def cfg_to_thermometer(thermometer, conf):
     """ read given thermometer configuration into thermometer """
-    cfg_to_sensor(thermometer, conf)
+    if conf:
+        cfg_to_sensor(thermometer, conf)
 
-    if 'buffer' in conf:
-        thermometer.buffersize = conf['buffer']
-    if 'precision' in conf:
-        thermometer.precision = conf['precision']
-    if 'buffer' in conf:
-        thermometer.buffersize = conf['buffer']
-    if 'resolution' in conf:
-        thermometer.resolution = conf['resolution']
-    if 'alerts' in conf:
-        thermometer.alerts = []
-        for _cfg in conf['alerts']:
-            if len(_cfg) == 4:
-                _alert = Alert(thermometer, _cfg[1], _cfg[2], _cfg[3])
-                if _cfg[0][0] == '>':
-                    _alert.triggerpoint = float(_cfg[0][1:])
-                    thermometer.alerts.append(_alert)
-                elif _cfg[0] == 'fault':
-                    _alert.triggerpoint = Contact.STATUS_FAULT
-                    thermometer.alerts.append(_alert)
+        if 'buffer' in conf:
+            thermometer.buffersize = conf['buffer']
+        if 'precision' in conf:
+            thermometer.precision = conf['precision']
+        if 'buffer' in conf:
+            thermometer.buffersize = conf['buffer']
+        if 'resolution' in conf:
+            thermometer.resolution = conf['resolution']
+        if 'alerts' in conf:
+            thermometer.alerts = []
+            for _cfg in conf['alerts']:
+                if len(_cfg) == 4:
+                    _alert = Alert(thermometer, _cfg[1], _cfg[2], _cfg[3])
+                    if _cfg[0][0] == '>':
+                        _alert.triggerpoint = float(_cfg[0][1:])
+                        thermometer.alerts.append(_alert)
+                    elif _cfg[0] == 'fault':
+                        _alert.triggerpoint = Thermometer.STATUS_FAULT
+                        thermometer.alerts.append(_alert)
+
+# *****************************************************
+#  functions to create and find sensors in list
+# *****************************************************
 
 def create():
     """ Initialize sensors list and keep updated """
+    if 'hostname' in cfg:
+        Sensor.hostname = cfg['hostname']
 
     # get list of configured thermometers
     thermometers_config = [_s for _s in cfg['sensors']
         if 'thermometer' in _s]
-    for t_cfg in thermometers_config:
-        Thermometer(t_cfg['thermometer'], t_cfg)
+    for config in thermometers_config:
+        if not get(config['thermometer']):
+            Thermometer(config['thermometer'], config)
 
     # get list of configured contacts
     contacts_config = [_s for _s in cfg['sensors'] if 'contact' in _s]
-    for c_cfg in contacts_config:
-        pin = int(c_cfg['contact'])
-        if 0 <= pin < 3:
-            Contact(c_cfg['contact'], Contact.GPIO[pin], c_cfg)
-
+    for config in contacts_config:
+        if not get(config['contact']):
+            pin = int(config['contact'])
+            if 0 <= pin < 3:
+                Contact(config['contact'], Contact.GPIO[pin], config)
 
     # get list of detected w1 thermometers
     t_list = glob.glob('/sys/bus/w1/devices/' + '10*')
-    for i in range(len(t_list)):
-        t_list[i] = t_list[i][20:]
-
-    # start unconfigured w1 thermometers
-    for t_id in t_list:
-        if not get(t_id):
-            t = Thermometer(t_id, [])
-            t.start()
-            list_.append(t)
+    for address in t_list:
+        if not get(address[20:]):
+            Thermometer(address[20:])
 
 def getlist(_type):
     """ collect list of all sensors of givent type """
-    _sensors = []
-    for _sensor in list_:
-        if _sensor.__class__.__name__ == _type:
-            _sensors.append(_sensor)
-    return _sensors
+    sensors = []
+    for sensor in list_:
+        if sensor.__class__.__name__ == _type:
+            sensors.append(sensor)
+    return sensors
 
-def get(_address):
+def get(address):
     """ find sensor by address or alias """
     # find by address
-    for _sensor in list_:
-        if _address == _sensor.address:
-            return _sensor
+    for sensor in list_:
+        if address == sensor.address:
+            return sensor
 
     # find by name
-    for _sensor in list_:
-        if _address == _sensor.name:
-            return _sensor
+    for sensor in list_:
+        if address == sensor.name:
+            return sensor
 
     # not found
     return False
